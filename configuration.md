@@ -490,6 +490,40 @@ Webhook notification is optional and disabled unless `webhook.enabled` is `true`
 
 When `request_body` is a JSON object or array, Horizon renders placeholders and serializes it as JSON. When it is a string, Horizon renders it directly and detects JSON if the rendered string is valid JSON.
 
+### Delivery Modes And Layouts
+
+`delivery` controls how many webhook messages Horizon sends:
+
+- `summary`: Sends one message containing the full daily summary. This is simple, but some chat platforms may reject long messages.
+- `summary_and_items`: Sends one overview message plus one message per selected item. In each item message, `#{summary}` contains only that item's Markdown body. This is useful for platforms that reject or truncate long messages.
+
+`layout` controls how each message is rendered:
+
+- `markdown`: Uses your `request_body` template for each message. This is the default and works with generic webhooks, DingTalk, Slack, Discord, Feishu, and Lark.
+- `collapsible`: Currently supported for `platform: "feishu"` or `"lark"`. Horizon ignores `request_body` and builds one Feishu/Lark Card JSON 2.0 message with each item in a collapsed panel.
+
+For platforms without a platform-specific layout, keep `layout: "markdown"` and choose the message count with `delivery`.
+
+Example `summary_and_items` Markdown delivery config:
+
+```json
+{
+  "webhook": {
+    "enabled": true,
+    "url_env": "HORIZON_WEBHOOK_URL",
+    "delivery": "summary_and_items",
+    "overview_position": "last",
+    "platform": "generic",
+    "layout": "markdown",
+    "request_body": {
+      "text": "#{message_title}\n\n#{summary?limit=3000&split=---}"
+    }
+  }
+}
+```
+
+With `summary_and_items`, Horizon sends one overview plus one message per selected item. `overview_position: "last"` sends item messages first and keeps the overview as the newest chat message; omit it or set `"first"` to send the overview first.
+
 ### Webhook Templates
 
 Available variables:
