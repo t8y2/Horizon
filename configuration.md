@@ -123,6 +123,26 @@ Available models: `MiniMax-M3`, `MiniMax-M2.7`, `MiniMax-M2.7-highspeed`
 
 Use the [DashScope compatible-mode](https://help.aliyun.com/zh/dashscope/developer-reference/use-dashscope-by-calling-openai-api) endpoint. Set `DASHSCOPE_API_KEY` in your `.env`. Optional: set `base_url` to override the default `https://dashscope.aliyuncs.com/compatible-mode/v1`.
 
+**Ollama**:
+
+```json
+{
+  "ai": {
+    "provider": "ollama",
+    "model": "llama3.1",
+    "api_key_env": "",
+    "base_url": "http://192.168.1.10:11434",
+    "throttle_sec": 0
+  }
+}
+```
+
+Omit `base_url` to use the default `http://localhost:11434/v1`.
+For remote Ollama servers, set `ai.base_url` in `data/config.json` or set
+`HORIZON_OLLAMA_BASE_URL` in `.env`. `OLLAMA_BASE_URL` and `OLLAMA_HOST` are
+also recognized. If the value omits `/v1`, Horizon appends it automatically
+for Ollama's OpenAI-compatible endpoint.
+
 ### AI throttling
 
 If your model has a strict per-minute request cap, you can slow the scorer down in `data/config.json`:
