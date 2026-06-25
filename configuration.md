@@ -252,6 +252,8 @@ All sources are configured under the top-level `sources` key in `config.json`.
 
 ### Reddit
 
+Reddit scraping is free and does not require API keys. Subreddit posts and comments prefer `old.reddit.com`; JSON and RSS endpoints are used as fallbacks when needed.
+
 ```json
 {
   "sources": {

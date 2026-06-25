@@ -93,11 +93,14 @@ Fetches any Atom/RSS feed using the `feedparser` library. Tries multiple date fi
 
 **File**: `src/scrapers/reddit.py`
 
-Uses Reddit's public JSON API (`www.reddit.com`):
+Uses public, no-key Reddit endpoints. Subreddit listings and comments prefer `old.reddit.com` HTML because Reddit's unauthenticated JSON and RSS endpoints can intermittently block or fail:
 
-- `GET /r/{subreddit}/{sort}.json` — subreddit posts
+- `GET https://old.reddit.com/r/{subreddit}/{sort}/` — subreddit posts
+- `GET https://old.reddit.com/r/{subreddit}/comments/{post_id}/` — post comments
+- `GET /r/{subreddit}/{sort}.json` — subreddit posts fallback
 - `GET /user/{username}/submitted.json` — user submissions
-- `GET /r/{subreddit}/comments/{post_id}.json` — post comments
+- `GET /r/{subreddit}/comments/{post_id}.json` — post comments fallback
+- `GET /r/{subreddit}/{sort}/.rss` — subreddit posts fallback when JSON is blocked
 
 Subreddits and users are fetched concurrently. Comments are sorted by score, limited to the configured count, and exclude moderator-distinguished comments. Self-text is truncated at 1500 chars, comments at 500 chars.
 
@@ -129,7 +132,7 @@ Subreddits and users are fetched concurrently. Comments are sorted by score, lim
 - `time_filter` — for `top`/`rising` sorts: `hour`, `day`, `week`, `month`, `year`, `all`
 - `min_score` — minimum post score (subreddits only)
 
-**Rate limiting**: Detects HTTP 429 responses, reads the `Retry-After` header, waits, and retries once. Uses a descriptive `User-Agent` as required by Reddit's API guidelines.
+**Rate limiting**: Detects HTTP 429 responses on JSON requests, reads the `Retry-After` header, waits, and retries once. Uses browser-like request headers for no-key public access.
 
 **Extracted data**: title, URL, author, score, upvote ratio, comment count, subreddit, flair, self-text, and top comments.
 
