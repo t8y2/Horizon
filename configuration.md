@@ -5,7 +5,29 @@ title: Configuration Guide
 
 # Configuration Guide
 
-Horizon is configured through two files: a `.env` file for API keys and a `data/config.json` file for sources, AI provider, and filtering options.
+Horizon is configured through two files: a `.env` file for API keys and a JSON file for sources, AI provider, and filtering options. The JSON file defaults to `data/config.json`.
+
+## Configuration Paths
+
+The CLI resolves configuration and state paths as follows:
+
+| Option | Effect |
+| --- | --- |
+| `-d`, `--data-dir PATH` | Changes the state directory used for summaries, subscribers, and the default `<data-dir>/config.json` path. |
+| `-c`, `--config PATH` | Uses an explicit config file without changing the state directory. |
+
+```bash
+uv run horizon --data-dir /srv/horizon
+uv run horizon --config /etc/horizon/config.json
+uv run horizon --data-dir /srv/horizon --config /etc/horizon/config.json
+```
+
+When both options are present, configuration is loaded from `--config`, while summaries and subscribers remain under `--data-dir`. The setup wizard writes the default `data/config.json`; initialize a custom location manually:
+
+```bash
+mkdir -p /etc/horizon
+cp data/config.example.json /etc/horizon/config.json
+```
 
 ## AI Providers
 
@@ -21,7 +43,7 @@ GOOGLE_API_KEY=your-gemini-key
 ```
 
 When Horizon starts, environment variables have priority because
-`data/config.json` does not store the secret. For local VS Code runs, create
+the active config file does not store the secret. For local VS Code runs, create
 `.env` in the repository root and launch Horizon from that same root directory.
 
 Common API key variable names:
@@ -166,14 +188,14 @@ Use the [DashScope compatible-mode](https://help.aliyun.com/zh/dashscope/develop
 ```
 
 Omit `base_url` to use the default `http://localhost:11434/v1`.
-For remote Ollama servers, set `ai.base_url` in `data/config.json` or set
+For remote Ollama servers, set `ai.base_url` in the active config file or set
 `HORIZON_OLLAMA_BASE_URL` in `.env`. `OLLAMA_BASE_URL` and `OLLAMA_HOST` are
 also recognized. If the value omits `/v1`, Horizon appends it automatically
 for Ollama's OpenAI-compatible endpoint.
 
 ### AI throttling
 
-If your model has a strict per-minute request cap, you can slow the scorer down in `data/config.json`:
+If your model has a strict per-minute request cap, you can slow the scorer down in the active config file:
 
 ```json
 {
@@ -416,7 +438,7 @@ uv pip install --only-binary=:all: openbb openbb-benzinga
 - `category` — optional tag stored on fetched items
 - `symbols` — ticker symbols to fetch together; group symbols by provider to keep requests efficient
 
-OpenBB provider credentials are handled by the OpenBB SDK itself, using its own environment variables or user settings. Horizon does not pass those secrets through `data/config.json`.
+OpenBB provider credentials are handled by the OpenBB SDK itself, using its own environment variables or user settings. Horizon does not pass those secrets through the active config file.
 
 ### OSS Insight (Trending GitHub Repos)
 
@@ -512,7 +534,7 @@ the first group in configuration order. Omitting both `category_groups` and
 
 ## Environment Variable Substitution
 
-Any string value in `data/config.json` supports `${VAR_NAME}` syntax. Variables are expanded at runtime from the environment (including values loaded from `.env`). This lets you keep secrets, tenant-specific endpoints, and private URLs out of the checked-in JSON file.
+Any string value in the active config file supports `${VAR_NAME}` syntax. Variables are expanded at runtime from the environment (including values loaded from `.env`). This lets you keep secrets, tenant-specific endpoints, and private URLs out of the checked-in JSON file.
 
 Example:
 
@@ -593,7 +615,7 @@ Resend SMTP example:
 }
 ```
 
-Set `RESEND_API_KEY` in `.env`. Recipients are loaded from `data/subscribers.json`.
+Set `RESEND_API_KEY` in `.env`. Recipients are loaded from `<data-dir>/subscribers.json` (`data/subscribers.json` by default).
 
 ## Webhook Notification
 
@@ -772,7 +794,7 @@ With this layout, Horizon sends one interactive card containing the overview and
 
 ## Static Site
 
-Horizon writes generated summaries to `data/summaries/` and copies publishable Markdown into `docs/` for the GitHub Pages site. The repository includes a ready-to-use workflow at `.github/workflows/daily-summary.yml`.
+Horizon writes generated summaries to `data/summaries/` (or `<data-dir>/summaries/` when `--data-dir` is set) and copies publishable Markdown into `docs/` for the GitHub Pages site. The repository includes a ready-to-use workflow at `.github/workflows/daily-summary.yml`.
 
 To use GitHub Pages, enable Pages for the repository and run the scheduled workflow or trigger it manually. The generated site is built from the `docs/` directory.
 
