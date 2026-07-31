@@ -106,6 +106,6 @@ Selected items are enriched according to the profile's `enrichment.md` prompt
 and block contract. A block can call a tool only when that tool is declared in
 the block's `tools` list. The only built-in tool is `web_search`.
 
-For every configured language, Horizon produces a localized title, optional
-lead, section blocks, and cited sources. See [Processing Profiles](profiles.md)
+For every configured language, Horizon produces a localized title, section
+blocks, and cited sources. See [Processing Profiles](profiles.md)
 for the complete profile schema and output behavior.

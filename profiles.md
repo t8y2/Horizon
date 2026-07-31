@@ -36,8 +36,8 @@ profiles/
 
 | Profile | Purpose | Output |
 | --- | --- | --- |
-| `tech-news` | Timely releases, incidents, research results, and technology-industry developments | Compact summary with optional background and community discussion |
-| `tech-blog` | Long-form engineering deep dives, tutorials, investigations, retrospectives, and technical arguments | One structured, multi-paragraph `story` |
+| `tech-news` | Timely releases, incidents, research results, and technology-industry developments | Compact summary and background with optional community discussion |
+| `tech-blog` | Long-form engineering deep dives, tutorials, investigations, retrospectives, and technical arguments | Required background, solution, and takeaway sections |
 
 The blog profile uses larger input budgets, head-middle-tail sampling, no score
 filtering, and no AI topic deduplication. For RSS feeds, pair it with a full-text
@@ -99,13 +99,13 @@ profiles are found or the default does not exist.
       {
         "id": "summary",
         "type": "section",
-        "tools": []
+        "tools": [],
+        "primary": true
       },
       {
         "id": "background",
         "type": "section",
-        "tools": ["web_search"],
-        "optional": true
+        "tools": ["web_search"]
       },
       {
         "id": "community_discussion",
@@ -141,6 +141,7 @@ default; set `optional` to `true` when they may be omitted.
 | `type` | Must be `"section"`. |
 | `tools` | Tools allowed for this block. Declare it on every block; use `[]` when none are allowed. |
 | `optional` | Whether output may omit the block. Defaults to `false`. |
+| `primary` | Render this required block directly below the item title without a block heading. At most one block may be primary. Defaults to `false`. |
 
 Prompt paths cannot escape their profile directory. Unknown fields are rejected
 in profile JSON.
@@ -218,6 +219,10 @@ Tools are allowed per block through its `tools` array. The only built-in tool is
 `"tools": ["web_search"]`. Use an empty array for blocks that need no tools.
 Unknown tools are rejected when profiles are initialized.
 
+Tool planning receives each block's required or optional status. For required
+blocks with tools, it uses a tool unless the source already provides enough
+evidence; tool failures do not make the block optional.
+
 ## Content Selection
 
 Profiles can control how much source content each AI stage receives:
@@ -263,11 +268,16 @@ For each language in `ai.languages`, enrichment produces a localized artifact
 with:
 
 - a title;
-- an optional lead paragraph;
 - the profile's required and applicable optional section blocks; and
 - cited external sources referenced by those blocks.
 
-The Markdown briefing renders the localized title and lead, each block under
-its localized heading, and a sources list when external references were used.
-Items are grouped by Profile: the briefing title is H1, localized Profile names
-are H2 sections, items are H3 headings, and artifact blocks are H4 headings.
+Artifacts generated for `zh` are normalized to Simplified Chinese before they
+are stored and rendered, including older artifacts read during rendering.
+
+The Markdown briefing renders a block marked `primary` directly below the item
+title and before the source line, without a redundant block heading. Profiles
+without a primary block show the source first and then render every block under
+its bold localized title on the same line as its content. External references
+follow the blocks when used. Items
+are grouped by Profile: the briefing title is H1, localized Profile names are H2
+sections, and items are H3 headings.
