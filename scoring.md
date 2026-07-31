@@ -5,74 +5,107 @@ title: Scoring System
 
 # Scoring System
 
-After fetching content from all sources, Horizon uses an AI model to score each item on a 0-10 scale. This determines what appears in the daily summary.
+After fetching content, Horizon resolves a processing profile for each item and
+uses that profile's analysis prompt. A profile may score items on a 0-10 scale
+and filter them at its own threshold, or disable score filtering entirely.
 
 ## Pipeline
 
-1. **Batch processing** — Items are scored in batches of 10 with a progress bar. Failed items receive a score of 0.
-2. **Content preparation** — For each item, the content is truncated (800 chars if comments are present, 1000 otherwise) and engagement metrics are assembled from metadata (HN score, Reddit upvote ratio, etc.).
-3. **AI analysis** — The prepared content is sent to the configured AI model (temperature 0.3) with a system prompt defining the scoring criteria.
-4. **Response parsing** — The AI response is parsed as JSON (with fallbacks for code-block-wrapped JSON). Each item gets: `ai_score` (float), `ai_reason` (string), `ai_summary` (string), and `ai_tags` (list).
-5. **Retry** — Failed AI calls are retried up to 3 times with exponential backoff (2-10 seconds).
+1. **Profile resolution** — An explicit source profile is used directly. A
+   missing profile or `"auto"` is matched by AI using the loaded `match.md`
+   prompts.
+2. **Content preparation** — Content is truncated to 800 characters when
+   comments are present and 1000 otherwise. Available comments and engagement
+   metadata are added separately.
+3. **Profile analysis** — The selected profile's `analysis.md` prompt evaluates
+   the item and returns a score, reason, one-sentence summary, and tags.
+4. **Validation and retry** — Responses are parsed as JSON. Failed AI calls are
+   retried with exponential backoff; a structurally invalid result is recorded
+   as an analysis failure.
+5. **Profile filtering** — If the profile filter is enabled, only items meeting
+   its threshold continue. A disabled profile filter keeps analyzed items
+   without score thresholding.
+6. **Digest selection** — Topic deduplication and optional category quotas or a
+   final item cap run before enrichment.
 
-## Scoring Scale
+Analysis and enrichment concurrency are configured through
+`ai.analysis_concurrency` and `ai.enrichment_concurrency`. Result order is
+preserved during analysis.
+
+## Profile Rubrics
+
+Each profile defines its own rubric in `analysis.md`. The built-in `tech-news`
+profile uses this scale:
 
 | Score | Tier | Description |
-|-------|------|-------------|
-| 9-10 | Groundbreaking | Major breakthroughs, paradigm shifts, major version releases, significant research breakthroughs |
-| 7-8 | High Value | Important developments, technical deep-dives, novel approaches, insightful analysis, valuable tools |
-| 5-6 | Interesting | Incremental improvements, useful tutorials, moderate community interest |
-| 3-4 | Low Priority | Minor updates, common knowledge, overly promotional |
-| 0-2 | Noise | Spam, off-topic, trivial updates |
+| --- | --- | --- |
+| 9-10 | Groundbreaking | Major breakthroughs, paradigm shifts, major versions, significant research, or industry-changing announcements |
+| 7-8 | High value | Important developments, technical deep-dives, novel approaches, insightful analysis, or valuable tools |
+| 5-6 | Interesting | Incremental improvements, useful tutorials, moderate community interest, or useful but non-urgent developments |
+| 3-4 | Low priority | Routine updates, common knowledge, shallow treatment, or promotion-dominated content |
+| 0-2 | Noise | Spam, off-topic material, trivial updates, or purely promotional content |
 
-## Scoring Factors
-
-The AI evaluates each item based on:
-
-- **Technical depth and novelty** — original ideas, new techniques, research contributions
-- **Potential impact** — how broadly this affects software engineering, AI/ML, or systems research
-- **Quality of writing/presentation** — clarity, structure, thoroughness
-- **Community discussion** — insightful comments, diverse viewpoints, substantive debates
-- **Engagement signals** — high upvotes/favorites paired with substantive discussion (not just raw numbers)
-
-Engagement metadata is source-specific: HN provides score and comment count, Reddit provides upvote ratio and comment count.
+Its prompt considers technical depth, novelty, likely impact, source quality,
+relevance, concrete evidence, and substantive community discussion. Other
+profiles can define different criteria for different content forms.
 
 ## Filtering
 
-After scoring, items are filtered by `filtering.ai_score_threshold` (default: `7.0`) and sorted by score descending. Optional balanced digest quotas are then applied before enrichment.
+The threshold belongs to the profile's `filter` object:
 
 ```json
 {
-  "filtering": {
-    "ai_score_threshold": 7.0,
-    "time_window_hours": 24,
+  "filter": {
+    "enabled": true,
+    "threshold": 8.0
+  }
+}
+```
+
+When filtering is enabled, `threshold` is required and accepts values from 0 to
+10. Items at or above the threshold continue. To analyze content without
+dropping it by score, disable the profile filter:
+
+```json
+{
+  "filter": {
+    "enabled": false
+  }
+}
+```
+
+Collection and balanced digest settings remain in the runtime configuration:
+
+```json
+{
+  "collection": {
+    "time_window_hours": 24
+  },
+  "digest": {
     "max_items": 20,
     "category_groups": {
       "ai": {
         "limit": 5,
         "categories": ["ai-news", "ai-tools", "machine-learning"]
       }
-    }
+    },
+    "default_group": "other",
+    "default_group_limit": 3
   }
 }
 ```
 
-`category_groups` limits each configured category group independently.
-`max_items` caps the merged result. Both fields are optional; without them,
-scoring and filtering behave as before.
+`collection.time_window_hours` controls the fetch window. `category_groups`
+limits each configured category group independently, and `max_items` caps the
+merged result. These digest limits run after per-profile filtering and topic
+deduplication, but before enrichment.
 
-Items scoring 9.0 or above are featured in the "Today's Highlights" section of the summary.
+## Enrichment And Output
 
-## Enrichment
+Selected items are enriched according to the profile's `enrichment.md` prompt
+and block contract. A block can call a tool only when that tool is declared in
+the block's `tools` list. The only built-in tool is `web_search`.
 
-Items that pass the score threshold and any balanced digest limits go through a second AI pass for enrichment (`src/ai/enricher.py`):
-
-1. **Concept extraction** — AI identifies 1-3 technical concepts in the item that may need explanation.
-2. **Web search** — Each concept is searched via DuckDuckGo to gather grounding context.
-3. **Structured analysis** — The item content and search results are sent to AI, which produces:
-   - `whats_new` — what specifically happened or changed
-   - `why_it_matters` — significance and impact
-   - `key_details` — notable technical details or caveats
-   - `background` — background knowledge for readers without deep domain expertise
-
-These fields are combined into a `detailed_summary` stored in the item's metadata and used in the final daily summary.
+For every configured language, Horizon produces a localized title, optional
+lead, section blocks, and cited sources. See [Processing Profiles](profiles.md)
+for the complete profile schema and output behavior.
