@@ -6,8 +6,8 @@ title: Scoring System
 # Scoring System
 
 After fetching content, Horizon resolves a processing profile for each item and
-uses that profile's analysis prompt. A profile may score items on a 0-10 scale
-and filter them at its own threshold, or disable score filtering entirely.
+uses that profile's analysis prompt to score items on a 0-10 scale. The runtime
+configuration may filter them at a user-selected threshold.
 
 ## Pipeline
 
@@ -22,9 +22,9 @@ and filter them at its own threshold, or disable score filtering entirely.
 4. **Validation and retry** — Responses are parsed as JSON. Failed AI calls are
    retried with exponential backoff; a structurally invalid result is recorded
    as an analysis failure.
-5. **Profile filtering** — If the profile filter is enabled, only items meeting
-   its threshold continue. A disabled profile filter keeps analyzed items
-   without score thresholding.
+5. **Profile filtering** — If a runtime threshold is configured for the resolved
+   profile, only items meeting it continue. Without a threshold, analyzed items
+   continue without score filtering.
 6. **Digest selection** — Topic deduplication and optional category quotas or a
    final item cap run before enrichment.
 
@@ -51,28 +51,39 @@ profiles can define different criteria for different content forms.
 
 ## Filtering
 
-The threshold belongs to the profile's `filter` object:
+Thresholds belong to the runtime configuration and are keyed by profile ID:
 
 ```json
 {
-  "filter": {
-    "enabled": true,
-    "threshold": 8.0
+  "processing": {
+    "profile_settings": {
+      "tech-news": {
+        "threshold": 8.0
+      }
+    }
   }
 }
 ```
 
-When filtering is enabled, `threshold` is required and accepts values from 0 to
-10. Items at or above the threshold continue. To analyze content without
-dropping it by score, disable the profile filter:
+`threshold` accepts values from 0 to 10. Items at or above the threshold
+continue. To analyze content without dropping it by score, use `null` or omit
+the profile's settings:
 
 ```json
 {
-  "filter": {
-    "enabled": false
+  "processing": {
+    "profile_settings": {
+      "tech-news": {
+        "threshold": null
+      }
+    }
   }
 }
 ```
+
+A threshold passed to an MCP operation overrides all configured profile
+thresholds for that operation. Analysis still produces scores when filtering is
+disabled; only the selection step is bypassed.
 
 Collection and balanced digest settings remain in the runtime configuration:
 
