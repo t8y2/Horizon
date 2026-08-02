@@ -62,6 +62,36 @@ Install the optional extractor locally with `uv sync --extra trafilatura`, or
 build Docker with `--build-arg EXTRAS=trafilatura`. Extraction
 failures fall back to the feed-provided content.
 
+## Contributing a Profile
+
+A profile is a reusable editorial policy for a content domain, not a user
+account, source list, or collection of personal interests. It tells Horizon:
+
+1. which items belong to the domain (`match.md`),
+2. how to evaluate and score them (`analysis.md`), and
+3. which content blocks to produce and how to write them (`profile.json` and
+   `enrichment.md`).
+
+To contribute a built-in profile, add `profiles/<id>/` with those four files and
+open a focused pull request. No Python changes are normally required.
+
+Before submitting, check that the profile:
+
+- covers a clear content domain that is useful to more than one source list or
+  individual user,
+- has a meaningful routing, evaluation, or output difference from existing
+  profiles,
+- states both what belongs and what does not belong in `match.md`,
+- defines a concrete 0-10 rubric in `analysis.md`,
+- keeps generated blocks specific, non-overlapping, and grounded in supplied
+  content or declared tools,
+- contains no credentials, private sources, or user-specific thresholds, and
+- passes `uv run pytest tests/test_profiles.py tests/test_prompting.py -q`.
+
+Built-in profiles are loaded as automatic-routing candidates, so maintainers may
+ask contributors to narrow ambiguous matching rules or clarify overlap before a
+profile is merged.
+
 Configure discovery in `data/config.json`:
 
 ```json
