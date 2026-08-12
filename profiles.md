@@ -340,4 +340,5 @@ its bold localized title on the same line as its content. External references
 follow the blocks when used. Items
 are grouped by Profile: the briefing title is H1, localized Profile names are H2
 sections, and items are H3 headings. Set `digest.profile_order` to control the H2
-section order; a non-empty list must contain every loaded Profile exactly once.
+section priority. Loaded Profiles omitted from the list are appended automatically
+in discovery order; unknown or duplicate IDs are rejected.

@@ -597,8 +597,10 @@ digest limits:
 ```
 
 - `max_items`: Optional final cap after all group limits are applied
-- `profile_order`: Optional final-summary section order. When non-empty, it must
-  list every loaded profile exactly once. The example keeps financial news last.
+- `profile_order`: Optional final-summary section priority. Loaded profiles not
+  listed here are appended automatically in profile discovery order. Unknown or
+  duplicate profile IDs are rejected. The example prioritizes the three listed
+  profiles in that order.
 - `category_groups`: Optional map of quota groups. Each group requires a positive
   `limit` and a non-empty `categories` list. Items within each group are kept by
   analysis score, highest first.
