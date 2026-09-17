@@ -70,6 +70,11 @@ and webhook message content are unchanged.
 
 ## Processing Profiles
 
+Profiles define how to evaluate and present content; the runtime configuration
+defines what you collect, how much you keep, and where it goes. Use `tech-news`
+for events and context, `tech-blog` for engineering lessons, `finance-news` for
+market developments, or `ai-creator` for content ideas.
+
 The `processing` section controls profile discovery and the fallback used when
 automatic matching cannot select a profile:
 
@@ -320,11 +325,18 @@ For OpenAI-compatible gateways, Horizon sends `temperature` by default. If a new
 ## Information Sources
 
 All sources are configured under the top-level `sources` key in `config.json`.
-Source entries also accept `profile`. An explicit profile ID uses that profile
-without an AI matching call. If `profile` is missing or set to `"auto"`, Horizon
-matches the item against the loaded profiles. An unknown explicit ID is an
-error. For nested sources, set the field on the item-producing entry, such as an
-RSS feed, Reddit subreddit or user, or OpenBB watchlist.
+Source entries also accept `profile`:
+
+| Value | Behavior |
+| --- | --- |
+| `"tech-blog"` | Use that profile directly, without an AI matching call |
+| `"auto"` or omitted | Let AI choose one of all loaded profiles |
+| `["tech-news", "finance-news"]` | Let AI choose one profile from this candidate list |
+
+An unknown profile ID is an error. For nested sources, set the field on the
+item-producing entry, such as an RSS feed, Reddit subreddit or user, Telegram
+channel, or OpenBB watchlist. See [Source Routing](profiles.md#source-routing)
+for validation and fallback rules.
 
 ### GitHub
 
@@ -454,6 +466,7 @@ Requires an [Apify](https://apify.com) account. Set `APIFY_TOKEN` in your `.env`
     "twitter": {
       "enabled": true,
       "users": ["karpathy", "ylecun"],
+      "keywords": ["LLM", "open source"],
       "fetch_limit": 10,
       "category": "social",
       "fetch_reply_text": false,
@@ -466,12 +479,17 @@ Requires an [Apify](https://apify.com) account. Set `APIFY_TOKEN` in your `.env`
 ```
 
 - `users` — Twitter screen names to monitor, without the `@` prefix
-- `fetch_limit` — maximum tweets to fetch per run (across all users combined; minimum 100 due to actor constraint)
+- `keywords` — independent X search queries fetched via Apify scweet `source_mode: "search"`. These search beyond the configured `users`; they do not filter those users' timelines. Playwright mode logs a warning and skips keyword fetching.
+- `fetch_limit` — in Apify mode, the requested tweet limit per actor run is `max(100, fetch_limit)`. All configured users share one profile run, and each non-empty keyword query starts a separate search run. This is not a total limit for the Twitter source.
 - `category` — optional tag for balanced digest grouping (applies to all tweets from this source)
 - `fetch_reply_text` — when `true`, fetch actual reply bodies for important tweets and append them under `--- Top Comments ---` so the AI can factor in community discussion. Disabled by default.
 - `max_replies_per_tweet` — maximum reply lines to append per tweet (default: 3)
 - `max_tweets_to_expand` — cap on how many tweets get reply expansion per run, to control Apify credit usage (default: 10)
 - `reply_min_likes` — only include replies with at least this many likes (default: 0)
+
+You can configure users, keywords, or both. Results are filtered to the current time window and merged, with duplicate tweet IDs removed across timelines and searches.
+
+For example, the configuration above starts three discovery runs: one for both users and one for each of the two keywords. Each run requests up to 100 tweets, for up to 300 before time filtering and deduplication. Adding keyword queries increases Apify usage; optional reply expansion starts additional runs.
 
 The scraper uses the `altimis/scweet` actor by default. You can override it with `actor_id` if needed.
 
@@ -597,10 +615,11 @@ digest limits:
 ```
 
 - `max_items`: Optional final cap after all group limits are applied
-- `profile_order`: Optional final-summary section priority. Loaded profiles not
-  listed here are appended automatically in profile discovery order. Unknown or
-  duplicate profile IDs are rejected. The example prioritizes the three listed
-  profiles in that order.
+- `profile_order`: Optional final-summary section priority. When non-empty,
+  loaded profiles not listed here are appended in profile discovery order.
+  When empty or omitted, sections follow their first appearance in the selected
+  items. Unknown or duplicate IDs are rejected. The example prioritizes the
+  three listed profiles in that order.
 - `category_groups`: Optional map of quota groups. Each group requires a positive
   `limit` and a non-empty `categories` list. Items within each group are kept by
   analysis score, highest first.
@@ -912,7 +931,7 @@ uv run horizon-webhook --dry-run
 
 ## Static Site
 
-Horizon writes generated summaries to `data/summaries/` (or `<data-dir>/summaries/` when `--data-dir` is set) and copies publishable Markdown into `docs/` for the GitHub Pages site. The repository includes a ready-to-use workflow at `.github/workflows/daily-summary.yml`.
+Horizon writes generated summaries to `data/summaries/` (or `<data-dir>/summaries/` when `--data-dir` is set) and copies publishable Markdown into `docs/` for the GitHub Pages site. The repository includes a disabled daily workflow template at [`.github/workflows/daily-summary.yml.disabled`](../.github/workflows/daily-summary.yml.disabled). Configure it for your deployment and rename it to `daily-summary.yml` to enable scheduled generation.
 
 To use GitHub Pages, enable Pages for the repository and run the scheduled workflow or trigger it manually. The generated site is built from the `docs/` directory.
 
