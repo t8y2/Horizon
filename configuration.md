@@ -9,7 +9,7 @@ Horizon is configured through a `.env` file for secrets, a JSON file for runtime
 
 ## Configuration Paths
 
-`horizon`, `horizon-wizard`, and `horizon-webhook` all resolve configuration and state paths the same way:
+`horizon`, `horizon-wizard`, `horizon-webhook`, and `horizon-wechat` all resolve configuration and state paths the same way:
 
 | Option | Effect |
 | --- | --- |
@@ -928,6 +928,60 @@ uv run horizon-webhook --dry-run
 | `-c`, `--config PATH` | `<data-dir>/config.json` | Path to config file |
 | `-l`, `--log-level LEVEL` | `WARNING` | Logging level (DEBUG/INFO/WARNING/ERROR/CRITICAL) |
 
+
+## WeChat Notification
+
+Horizon sends briefings to your WeChat through the iLink Bot API, following
+Tencent's `openclaw-weixin` client protocol. Enable it in your configuration:
+
+```json
+{
+  "wechat": {
+    "enabled": true,
+    "languages": ["zh"],
+    "chunk_size": 4000
+  }
+}
+```
+
+- `enabled`: Defaults to `false`.
+- `languages`: Optional filter; omit it or use `null` to send all `ai.languages`.
+- `chunk_size`: Maximum characters per message, from 1 to 4000 (default: 4000).
+  Long briefings are split at paragraph or line boundaries where possible.
+
+```bash
+uv run horizon-wechat login                     # scan with WeChat, then message the bot
+uv run horizon-wechat status                    # connection and estimated replies left
+uv run horizon-wechat test --lang zh --dry-run  # preview without connecting or sending
+uv run horizon-wechat test --lang zh             # send a test message
+```
+
+The normal `horizon` run then delivers its generated briefings and failure
+notifications. Login credentials and the
+latest conversation context are saved in `<data-dir>/wechat_session.json`.
+Keep this file between scheduled runs; on POSIX it is written with mode `0600`.
+
+**WeChat limits:** a user message provides the context required for replies.
+Live testing of this integration observed a limit of 10 replies per context;
+Horizon tracks an estimate, reminds you when it runs low, and stops on a server
+rejection. Send the bot another message to refresh the context. Long or
+multilingual briefings may exhaust the budget partway through. A daily budget
+reset has not been confirmed; the API response remains authoritative.
+
+If setup timed out waiting for your first message, send one and run
+`uv run horizon-wechat status --refresh`. A receive-session timeout (`-14`) does
+not necessarily prevent delivery; if it persists, use `login --force`.
+Markdown is adapted for WeChat by flattening HTML and removing images and
+in-page links.
+
+For custom paths, put `-d` / `-c` before the subcommand, for example
+`uv run horizon-wechat -d ./my-data login`. With Docker, reuse the existing data
+mount and override the entrypoint:
+
+```bash
+docker compose run --rm --entrypoint uv horizon run horizon-wechat login
+docker compose run --rm --entrypoint uv horizon run horizon-wechat test --lang zh
+```
 
 ## Static Site
 
